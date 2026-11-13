@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  development-verification:
+    name: Development Verification
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Build package
+        run: npm run build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser tests
+        run: npm run test:browser
+
+      - name: Generate npm tarball
+        run: npm pack
+
+      - name: Upload npm tarball
+        if: matrix.node-version == '20.x'
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-tarball
+          path: '*.tgz'
+
+  runtime-package-verification:
+    name: Runtime Package Verification
+    needs: development-verification
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Download packed tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: package-tarball
+
+      - name: Run isolated consumer verification (ESM, CJS, and subpaths)
+        run: |
+          TARBALL=$(ls *.tgz | head -n 1)
+          echo "Testing consumer installation of $TARBALL"
+          mkdir -p /tmp/consumer-test
+          cd /tmp/consumer-test
+          npm init -y
+          npm install "$GITHUB_WORKSPACE/$TARBALL"
+          
+          # ESM test
+          cat << 'EOF' > test-esm.mjs
+          import { renderCodeToSvg, generateReadme, generateHtmlTable, renderMarkdown } from '@rahul_dadhich15/documentation-toolkit';
+          import { renderCodeToSvg as subCode } from '@rahul_dadhich15/documentation-toolkit/code-to-image';
+          import { generateMarkdownTable } from '@rahul_dadhich15/documentation-toolkit/markdown-table';
+          import { generateMarkdownToc } from '@rahul_dadhich15/documentation-toolkit/markdown-toc';
+          import { generateLicense } from '@rahul_dadhich15/documentation-toolkit/license-generate';
+          import { generateBadgeUrl } from '@rahul_dadhich15/documentation-toolkit/readme-badge';
+
+          console.log('Testing ESM root & subpath exports...');
+          if (!renderCodeToSvg({ code: 'const x = 1;' }).includes('<svg')) process.exit(1);
+          if (!subCode({ code: 'const x = 1;' }).includes('<svg')) process.exit(1);
+          if (!generateReadme({ projectName: 'test' }).includes('# test')) process.exit(1);
+          if (!generateHtmlTable({ rows: [['1']] }).html.includes('<table')) process.exit(1);
+          if (!renderMarkdown('# Heading').includes('Heading')) process.exit(1);
+          if (!generateMarkdownTable({ headers: ['H'], rows: [['R']] }).includes('| H')) process.exit(1);
+          if (!generateMarkdownToc('## Intro').tocMarkdown.includes('[Intro]')) process.exit(1);
+          if (!generateLicense('MIT', { author: 'Test' }).text.includes('MIT License')) process.exit(1);
+          if (!generateBadgeUrl({ type: 'npm-version', packageName: 'test' }).includes('https://img.shields.io')) process.exit(1);
+          console.log('ESM consumer checks passed.');
+          EOF
+          node test-esm.mjs
+
+          # CJS test
+          cat << 'EOF' > test-cjs.cjs
+          const { generateMarkdownTable } = require('@rahul_dadhich15/documentation-toolkit/markdown-table');
+          const { generateLicense } = require('@rahul_dadhich15/documentation-toolkit/license-generate');
+          const { generateBadgeUrl } = require('@rahul_dadhich15/documentation-toolkit/readme-badge');
+
+          console.log('Testing CommonJS subpath exports...');
+          if (!generateMarkdownTable({ headers: ['H'], rows: [['R']] }).includes('| H')) process.exit(1);
+          if (!generateLicense('MIT', { author: 'Test' }).text.includes('MIT License')) process.exit(1);
+          if (!generateBadgeUrl({ type: 'npm-version', packageName: 'test' }).includes('https://img.shields.io')) process.exit(1);
+          console.log('CommonJS consumer checks passed.');
+          EOF
+          node test-cjs.cjs
