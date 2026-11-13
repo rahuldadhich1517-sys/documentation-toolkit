@@ -8,6 +8,10 @@
     "type": "git",
     "url": "https://github.com/rahul_dadhich15/documentation-toolkit.git"
   },
+   "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "keywords": [
     "documentation",
     "developer-tools",
