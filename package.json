@@ -105,7 +105,7 @@
     "mermaid": "^11.4.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.50.1",
+    "@playwright/test": "1.52.0",
     "@types/dompurify": "^3.0.5",
     "@types/node": "^22.13.4",
     "@typescript-eslint/eslint-plugin": "^8.24.1",
