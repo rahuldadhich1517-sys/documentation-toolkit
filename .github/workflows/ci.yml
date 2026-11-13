@@ -9,7 +9,7 @@ on:
 jobs:
   development-verification:
     name: Development Verification
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         node-version: [18.x, 20.x, 22.x]
@@ -58,7 +58,7 @@ jobs:
   runtime-package-verification:
     name: Runtime Package Verification
     needs: development-verification
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         node-version: [18.x, 20.x, 22.x]
