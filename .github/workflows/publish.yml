@@ -36,7 +36,7 @@ jobs:
         run: npm test
 
       - name: Set GitHub Packages scope
-        run: npm pkg set name=@rahuldadhich1517-sys/developer-utilities-toolkit
+        run: npm pkg set name=@rahuldadhich1517-sys/documentation-toolkit
 
       - name: Publish package
         run: npm publish --registry=https://npm.pkg.github.com
